@@ -214,9 +214,9 @@ Merci pour votre intérêt.`;
 }
 
 function getTransporter() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_DEBUG } = process.env;
+  const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, EMAIL_USER, EMAIL_PASS, SMTP_DEBUG } = process.env;
 
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+  if (!SMTP_HOST || !EMAIL_USER || !EMAIL_PASS) {
     console.warn('[mailer] SMTP non configuré. Aucun email ne sera envoyé.');
     return null;
   }
@@ -233,7 +233,7 @@ function getTransporter() {
     port,
     secure,                         // 465 => true (SSL/TLS), 587 => false (STARTTLS)
     requireTLS: port === 587 && !secure,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
     logger: bool(SMTP_DEBUG),
     debug: bool(SMTP_DEBUG)
   });
@@ -252,10 +252,10 @@ async function sendConfirmationEmail(payload, candidatureId, dateSoumission) {
     const transporter = getTransporter();
     if (!transporter) return;
 
-    const smtpUser = process.env.SMTP_USER || 'no-reply@example.com';
+    const smtpUser = process.env.EMAIL_USER || 'no-reply@example.com';
     const envFrom  = process.env.EMAIL_FROM || smtpUser;
 
-    // From = SMTP_USER (meilleure compat DMARC). Reply-To = EMAIL_FROM si différent.
+    // From = EMAIL_USER (meilleure compat DMARC). Reply-To = EMAIL_FROM si différent.
     const from    = smtpUser;
     const replyTo = envFrom !== smtpUser ? envFrom : undefined;
 

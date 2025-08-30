@@ -130,8 +130,8 @@ CORS_ORIGINS=http://localhost:4200,https://your-frontend.com
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false            # 465 => true (SSL/TLS); 587 => false (STARTTLS)
-SMTP_USER=your.email@gmail.com
-SMTP_PASS=your-app-password
+EMAIL_USER=your.email@gmail.com
+EMAIL_PASS=your-app-password
 EMAIL_FROM="Admissions <no-reply@example.com>"
 EMAIL_BCC=admin@example.com
 
