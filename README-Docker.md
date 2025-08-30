@@ -75,7 +75,7 @@ DB_PASSWORD=your_password_here
 DB_NAME=gpe_yale
 
 # CORS
-CORS_ORIGINS=http://localhost:4200,https://gpe-yale.edocsflow.com
+CORS_ORIGINS=http://localhost:4200,http://localhost:5173,https://gpe-yale.edocsflow.com
 
 # SMTP
 EMAIL_HOST=smtp.gmail.com
@@ -224,6 +224,18 @@ tail -f logs/app.log
    
    # Vérifier les variables dans le conteneur
    docker exec gpyaleappback env | grep DB_
+   ```
+
+4. **Erreur CORS**
+   ```bash
+   # Tester la configuration CORS
+   node test-cors.js
+   
+   # Vérifier les logs CORS
+   docker exec gpyaleappback tail -f /app/logs/app.log | grep CORS
+   
+   # Ajouter votre domaine à CORS_ORIGINS dans .env
+   CORS_ORIGINS=http://localhost:4200,http://localhost:5173,https://yourdomain.com
    ```
 
 ### Réinitialisation complète

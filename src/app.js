@@ -15,16 +15,46 @@ app.use(express.json({ limit: '1mb' }));
 // CORS
 const parseOrigins = (str) => (!str ? [] : str.split(',').map(s => s.trim()).filter(Boolean));
 const whitelist = parseOrigins(process.env.CORS_ORIGINS);
+
+// Configuration CORS avec gestion des erreurs
 const corsOptions = {
-  origin: (origin, cb) => (!origin || whitelist.includes(origin)) ? cb(null, true) : cb(new Error('Origine non autorisée par CORS')),
-  credentials: true
+  origin: (origin, cb) => {
+    // Permettre les requêtes sans origine (comme les appels API directs)
+    if (!origin) {
+      return cb(null, true);
+    }
+    
+    // Vérifier si l'origine est dans la whitelist
+    if (whitelist.includes(origin)) {
+      return cb(null, true);
+    }
+    
+    // Log pour debug
+    console.log(`[CORS] Origine rejetée: ${origin}`);
+    console.log(`[CORS] Whitelist: ${whitelist.join(', ')}`);
+    
+    return cb(new Error('Origine non autorisée par CORS'));
+  },
+  credentials: true,
+  optionsSuccessStatus: 200 // Pour les navigateurs legacy
 };
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && !whitelist.includes(origin)) return res.status(403).json({ success: false, message: 'CORS: origine non autorisée' });
-  next();
-});
+
 app.use(cors(corsOptions));
+
+// Middleware pour gérer les erreurs CORS
+app.use((err, req, res, next) => {
+  if (err.message === 'Origine non autorisée par CORS') {
+    return res.status(403).json({
+      success: false,
+      message: 'CORS: origine non autorisée',
+      debug: {
+        origin: req.headers.origin,
+        whitelist: whitelist
+      }
+    });
+  }
+  next(err);
+});
 
 // Rate limit
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false }));

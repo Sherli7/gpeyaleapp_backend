@@ -14,7 +14,7 @@ services:
       - .env
     environment:
       - NODE_ENV=development
-      - FRONTEND_URL=http://localhost:4200
+      - FRONTEND_URL=http://localhost:5173
       - PORT=3003
       - DB_HOST=host.docker.internal
       - DB_PORT=5433
