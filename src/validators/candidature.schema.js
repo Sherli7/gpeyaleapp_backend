@@ -3,6 +3,7 @@ const Joi = require('joi');
 
 const niveauxEnum = ['Débutant', 'Intermédiaire', 'Avancé', 'Natif'];
 
+/** >= 18 ans */
 function isAdult(dateStr) {
   const dob = new Date(dateStr);
   if (isNaN(dob.getTime())) return false;
@@ -91,6 +92,7 @@ const schema = Joi.object({
     then: Joi.string().email().max(150).required(),
     otherwise: Joi.string().email().max(150).allow(null, '')
   }),
+
   source: Joi.string().max(50).required(),
   consentement: Joi.boolean().required()
 });
