@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Application backend pour le développement
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: gpyaleappback_dev
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - FRONTEND_URL=http://localhost:4200
+      - PORT=3003
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5433
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=gpe_yale
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=587
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - app-network-dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+
+networks:
+  app-network-dev:
+    driver: bridge
