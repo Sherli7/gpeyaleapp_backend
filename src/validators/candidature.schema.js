@@ -1,7 +1,7 @@
 // src/validators/candidature.schema.js
 const Joi = require('joi');
 
-const niveauxEnum = ['Débutant','Intermédiaire','Avancé','Natif'];
+const niveauxEnum = ['Débutant', 'Intermédiaire', 'Avancé', 'Natif'];
 
 function isAdult(dateStr) {
   const dob = new Date(dateStr);
