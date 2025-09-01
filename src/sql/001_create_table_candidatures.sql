@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS candidatures (
   id SERIAL PRIMARY KEY,
+  uuid UUID NOT NULL UNIQUE,              -- ajouté : sera fourni par le backend
   nom VARCHAR(100) NOT NULL,
   prenom VARCHAR(100) NOT NULL,
   nationalite VARCHAR(50) NOT NULL,
@@ -28,3 +29,11 @@ CREATE TABLE IF NOT EXISTS candidatures (
   consentement BOOLEAN NOT NULL DEFAULT TRUE,
   date_soumission TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Unicité insensible à la casse sur l'email
+CREATE UNIQUE INDEX IF NOT EXISTS candidatures_email_unique
+  ON candidatures (LOWER(email));
+
+-- (Optionnel) Index pour requêtes par date
+CREATE INDEX IF NOT EXISTS candidatures_date_idx
+  ON candidatures (date_soumission DESC);

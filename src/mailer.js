@@ -1,11 +1,12 @@
 // src/mailer.js
+'use strict';
+
 const nodemailer = require('nodemailer');
-const https = require('https');
 
 function bool(v, def = false) {
   if (v === undefined || v === null || v === '') return def;
   const s = String(v).toLowerCase().trim();
-  return s === '1' || s === 'true' || s === 'yes';
+  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
 }
 
 const COLORS = {
@@ -18,76 +19,12 @@ const COLORS = {
   border:  '#E5E7EB'
 };
 
-// Image entête distante (fallback)
-const HEADER_IMG_URL = 'https://gpe-cameroun.cm/wp-content/uploads/2025/08/2bbe10db-a8ef-45d1-8581-aadcfcce81ee.png';
-
 // ---------- Utils ----------
 function escapeHtml(x) {
   return String(x ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function fetchBuffer(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      if (res.statusCode && res.statusCode >= 400) {
-        return reject(new Error(`HTTP ${res.statusCode} fetching image`));
-      }
-      const chunks = [];
-      res.on('data', (d) => chunks.push(d));
-      res.on('end', () => resolve(Buffer.concat(chunks)));
-    }).on('error', reject);
-  });
-}
-
-async function compressImage(buffer, { width = 640, quality = 72, format = 'jpeg' } = {}) {
-  // Chargement dynamique de sharp (permet au code de marcher même si sharp n'est pas installé)
-  let sharp;
-  try {
-    sharp = require('sharp');
-  } catch {
-    return null; // pas de sharp -> pas de compression
-  }
-  format = String(format).toLowerCase();
-  const s = sharp(buffer).resize({ width, withoutEnlargement: true });
-  if (format === 'webp') {
-    return await s.webp({ quality }).toBuffer();
-  }
-  if (format === 'png') {
-    return await s.png({ quality }).toBuffer();
-  }
-  // défaut: jpeg progressif
-  return await s.jpeg({ quality, progressive: true }).toBuffer();
-}
-
-async function getInlineHeaderAttachment() {
-  if (!bool(process.env.EMAIL_INLINE_HEADER, true)) return null;
-
-  try {
-    const width   = Number(process.env.EMAIL_HEADER_WIDTH || 640);
-    const quality = Math.max(1, Math.min(100, Number(process.env.EMAIL_HEADER_QUALITY || 72)));
-    const format  = String(process.env.EMAIL_HEADER_FORMAT || 'jpeg').toLowerCase();
-
-    const original = await fetchBuffer(HEADER_IMG_URL);
-    const compressed = await compressImage(original, { width, quality, format });
-    if (!compressed) return null; // sharp indisponible
-
-    const mime = format === 'webp' ? 'image/webp'
-               : format === 'png'  ? 'image/png'
-               : 'image/jpeg';
-
-    return {
-      filename: `header.${format === 'jpeg' ? 'jpg' : format}`,
-      content: compressed,
-      contentType: mime,
-      cid: 'headerImage' // à référencer comme src="cid:headerImage"
-    };
-  } catch (e) {
-    console.warn('[mailer] Inline header fallback to remote URL:', e.message);
-    return null; // fallback URL distante
-  }
 }
 
 function renderNiveaux(niveaux) {
@@ -110,7 +47,8 @@ function renderNiveaux(niveaux) {
     </table>`;
 }
 
-function renderCandidatureHTML(payload, id, dateSoumission, headerSrc) {
+// ⬇️ Désormais on prend un UUID (pas l'ID numérique)
+function renderCandidatureHTML(payload, uuid, dateSoumission) {
   const p = payload || {};
   const ds = (dateSoumission && dateSoumission.toISOString) ? dateSoumission.toISOString() : new Date().toISOString();
 
@@ -122,32 +60,25 @@ function renderCandidatureHTML(payload, id, dateSoumission, headerSrc) {
 
   const niveauxTable = renderNiveaux(p.niveaux);
 
-  const headerImgTag = `
-    <img src="${headerSrc}" alt="GPE Cameroun" width="640"
-         style="display:block;width:100%;max-width:640px;height:auto;border:0;outline:none;text-decoration:none;"
-         border="0">`;
-
   return `<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="x-apple-disable-message-reformatting">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Confirmation de candidature – #${escapeHtml(id)}</title>
+  <title>Confirmation de candidature – #${escapeHtml(uuid)}</title>
 </head>
 <body style="margin:0;padding:0;background:${COLORS.bg};">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:${COLORS.bg};">
     <tr>
       <td align="center" style="padding:24px;">
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;background:${COLORS.card};border-radius:16px;overflow:hidden;border:1px solid ${COLORS.border};">
-          <tr>
-            <td style="background:${COLORS.primary};padding:0;">${headerImgTag}</td>
-          </tr>
+          <tr><td style="background:${COLORS.primary};height:6px;font-size:0;line-height:0;">&nbsp;</td></tr>
           <tr>
             <td style="padding:20px 24px 8px 24px;">
               <h1 style="margin:0 0 6px 0;font-family:Arial,Helvetica,sans-serif;color:${COLORS.primary};font-size:22px;line-height:1.25;">Confirmation de candidature</h1>
               <p style="margin:0;font-family:Arial,Helvetica,sans-serif;color:${COLORS.muted};font-size:14px;">
-                Identifiant : <strong style="color:${COLORS.text}">#${escapeHtml(id)}</strong> &nbsp;·&nbsp;
+                Identifiant : <strong style="color:${COLORS.text}">#${escapeHtml(uuid)}</strong> &nbsp;·&nbsp;
                 Soumise le : <strong style="color:${COLORS.text}">${escapeHtml(ds)}</strong>
               </p>
             </td>
@@ -159,9 +90,9 @@ function renderCandidatureHTML(payload, id, dateSoumission, headerSrc) {
                 Nous vous confirmons la réception de votre candidature. Voici un récapitulatif de votre soumission.
               </p>
               <div style="margin:10px 0 16px 0;">
-                <a href="#" style="display:inline-block;padding:12px 18px;background:${COLORS.accent};color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;">
+                <span style="display:inline-block;padding:12px 18px;background:${COLORS.accent};color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;">
                   Candidature enregistrée
-                </a>
+                </span>
               </div>
             </td>
           </tr>
@@ -194,13 +125,13 @@ function renderCandidatureHTML(payload, id, dateSoumission, headerSrc) {
 </html>`;
 }
 
-function renderTextFallback(payload, id, dateSoumission) {
+function renderTextFallback(payload, uuid, dateSoumission) {
   const p = payload || {};
   const ds = (dateSoumission && dateSoumission.toISOString) ? dateSoumission.toISOString() : new Date().toISOString();
   return `Bonjour ${p.prenom || ''} ${p.nom || ''},
 
 Votre candidature a bien été reçue.
-Identifiant: #${id}
+Identifiant: #${uuid}
 Date de soumission: ${ds}
 
 Récapitulatif:
@@ -214,16 +145,15 @@ Merci pour votre intérêt.`;
 }
 
 function getTransporter() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, EMAIL_USER, EMAIL_PASS, SMTP_DEBUG } = process.env;
+  const { SMTP_HOST, SMTP_SECURE, EMAIL_USER, EMAIL_PASS, SMTP_DEBUG } = process.env;
+  const port = Number(process.env.SMTP_PORT || 587);
 
   if (!SMTP_HOST || !EMAIL_USER || !EMAIL_PASS) {
     console.warn('[mailer] SMTP non configuré. Aucun email ne sera envoyé.');
     return null;
   }
 
-  const port = Number(SMTP_PORT || 587);
   const secure = bool(SMTP_SECURE, port === 465);
-
   if (port === 587 && secure) {
     console.warn('[mailer] Attention: SMTP_SECURE=true avec port 587. Utilisez false (STARTTLS) ou port 465.');
   }
@@ -231,23 +161,24 @@ function getTransporter() {
   const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port,
-    secure,                         // 465 => true (SSL/TLS), 587 => false (STARTTLS)
+    secure,                         // 465 => SSL, 587 => STARTTLS (secure=false)
     requireTLS: port === 587 && !secure,
     auth: { user: EMAIL_USER, pass: EMAIL_PASS },
     logger: bool(SMTP_DEBUG),
-    debug: bool(SMTP_DEBUG)
+    debug: bool(SMTP_DEBUG),
+    tls: { minVersion: 'TLSv1.2', servername: SMTP_HOST }
   });
 
   if (bool(process.env.EMAIL_VERIFY_ON_BOOT)) {
     transporter.verify()
       .then(() => console.log('[mailer] SMTP prêt (verify OK).'))
-      .catch((e) => console.error('[mailer] Échec verify SMTP:', e.message));
+      .catch((e) => console.error('[mailer] Échec verify SMTP:', e?.message));
   }
-
   return transporter;
 }
 
-async function sendConfirmationEmail(payload, candidatureId, dateSoumission) {
+// ⚠️ Ici, on attend maintenant un UUID en 2e paramètre
+async function sendConfirmationEmail(payload, candidatureUuid, dateSoumission) {
   try {
     const transporter = getTransporter();
     if (!transporter) return;
@@ -255,39 +186,33 @@ async function sendConfirmationEmail(payload, candidatureId, dateSoumission) {
     const smtpUser = process.env.EMAIL_USER || 'no-reply@example.com';
     const envFrom  = process.env.EMAIL_FROM || smtpUser;
 
-    // From = EMAIL_USER (meilleure compat DMARC). Reply-To = EMAIL_FROM si différent.
+    // From = EMAIL_USER (DMARC). Reply-To = EMAIL_FROM si différent.
     const from    = smtpUser;
     const replyTo = envFrom !== smtpUser ? envFrom : undefined;
 
-    // Prépare header: inline compressé si possible, sinon URL distante
-    const inlineHeader = await getInlineHeaderAttachment();
-    const headerSrc = inlineHeader ? 'cid:headerImage' : HEADER_IMG_URL;
-
-    const html = renderCandidatureHTML(payload, candidatureId, dateSoumission, headerSrc);
-    const text = renderTextFallback(payload, candidatureId, dateSoumission);
+    const html = renderCandidatureHTML(payload, candidatureUuid, dateSoumission);
+    const text = renderTextFallback(payload, candidatureUuid, dateSoumission);
 
     const mailOptions = {
       from,
       replyTo,
       to: payload.email,
       bcc: process.env.EMAIL_BCC || undefined,
-      subject: `Confirmation de candidature – #${candidatureId}`,
+      subject: `Confirmation de candidature – #${candidatureUuid}`,
       html,
-      text,
-      attachments: inlineHeader ? [inlineHeader] : undefined
+      text
     };
 
-    transporter.sendMail(mailOptions)
-      .then(info => {
-        if (process.env.SMTP_DEBUG) console.log('[mailer] Email envoyé:', info.messageId);
-      })
-      .catch((e) => {
-        console.error('[mailer] Erreur envoi email (non bloquant):', e.message);
-      });
-
+    const info = await transporter.sendMail(mailOptions);
+    if (bool(process.env.SMTP_DEBUG)) console.log('[mailer] Email envoyé:', info.messageId, info.response);
   } catch (e) {
-    console.error('[mailer] Erreur interne (non bloquant):', e.message);
+    console.error('[mailer] Erreur envoi email (non bloquant):', e?.message || e);
   }
 }
 
-module.exports = { sendConfirmationEmail, getTransporter };
+module.exports = {
+  sendConfirmationEmail,
+  getTransporter,
+  renderCandidatureHTML, // pour le preview
+  renderTextFallback,    // pour le preview
+};
