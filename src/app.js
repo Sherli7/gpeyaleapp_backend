@@ -5,7 +5,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
 const candidatureRoutes = require('./routes/candidatures.routes'); // ✅ Router
-const errorHandler = require('./middlewares/error-handler');       // ✅ Middleware
+const { errorHandler, notFound } = require('./middlewares/error-handler');       // ✅ Middleware
 
 const app = express();
 

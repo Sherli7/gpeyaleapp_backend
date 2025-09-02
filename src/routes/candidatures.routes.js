@@ -145,7 +145,7 @@ router.post('/', validate(candidatureSchema), async (req, res, next) => {
       success: true,
       message: 'Candidature envoyée avec succès.',
       id,
-      uuid: publicUuid,                 // ✅ expose l’uuid si tu veux l’utiliser côté front
+      uuid: publicUuid,
       dateSoumission: date_soumission
     });
   } catch (err) {
